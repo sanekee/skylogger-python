@@ -1,0 +1,9 @@
+services:
+  skylogger:
+    container_name: skyloggr
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../:/app/src
+      - ../data:/app/data
