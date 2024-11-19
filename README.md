@@ -56,3 +56,8 @@ Automatic extract roating profile using opencv2 and image masking to detect seve
 ### 7. Sample output
 
 [Result.csv](./assets/results.csv)
+
+
+## What Next
+- [] Cleanup panel reading - read digit and group them by panel area instead of checking for area of interest first
+- [] Explore seven segment display detection with tesseract and custom training data.
