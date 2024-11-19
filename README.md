@@ -33,11 +33,14 @@ Automatic extract roating profile using opencv2 and image masking to detect seve
 
 ![Groups](./assets/step2-groups.png)
 
-### 3. Exract area of interests (monitoring area - TEMP / POWER / FAN)
+### 3. Exract area of interests (monitoring area - Temperature / Power / Fan)
 
-![TEMP](./assets/step3-temp.png)<br/>
-![POWER](./assets/step3-power.png)<br/>
-![FAN](./assets/step3-fan.png)<br/>
+
+| Area of Interest | |
+|--|--|
+| Temperature | ![TEMP](./assets/step3-temp.png) |
+| Power | ![POWER](./assets/step3-power.png) |
+| Fan | ![FAN](./assets/step3-fan.png) |
 
 ### 4. Extract Digits
 
