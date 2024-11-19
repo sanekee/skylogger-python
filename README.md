@@ -12,15 +12,16 @@ Automatic extract roating profile using opencv2 and image masking to detect seve
    **Args**:
    | Arg | Description |
    | --- | ------------------------ |
-   | --debug | Output debugging images [true|false] |
    | --masks | Directory with masks images. |
    | --rotate | Rotate image [auto|degree] |
+   | --interval | Extract frame every second |
    | --skip | Skip seconds from beginning of video |
    | --count | Number of frame to extract |
+   | --debug | Output debugging images [true|false] |
 
    Example:
     ```shell
-    python3 main.py video.mp4 output --debug=true --masks=./masks --rotate=auto --skip=5 --count=10
+    python3 main.py video.mp4 output --debug=true --masks=./masks --rotate=auto --skip=5 --count=10 --interval=30
     ```
 ## Operation Steps
 
