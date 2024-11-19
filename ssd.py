@@ -1,6 +1,7 @@
 import os
 import cv2
 
+# segment pattern
 digit_segments = [
     [1, 1, 1, 1, 1, 1, 0], # 0
     [0, 1, 1, 0, 0, 0, 0], # 1
@@ -19,8 +20,10 @@ digit_segments = [
     [0, 0, 0, 1, 1, 1, 0], # L
 ]
 
+# digit mapping
 digits_map = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ', 'A', 'T', 'C', 'L']
 
+# monitor info
 panel_monitors = {
     "TEMP": {
         'num_digits': 3,    
@@ -134,6 +137,13 @@ panel_monitors = {
 }
 
 def detect_ssd(context):
+    """
+    Detect SSD - detect skywalker roaster seven segment display from image capture
+
+    Args:
+        context (dict): a dictionary with the required data.
+
+    """
     gray = context['gray_image']
 
     ((fw,fh), baseline) = cv2.getTextSize("TEST", cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
@@ -383,7 +393,10 @@ def extract_box(image, box):
     return roi
 
 def output_step(context, name, boxes):
-    output_path = context['output_path']
+    if not context['debug']:
+        return
+
+    output_path = context['debug_output_path']
     section = context.get('section', 'full')
     
     section_output_path = os.path.join(output_path, section)
@@ -397,7 +410,10 @@ def output_step(context, name, boxes):
 
 
 def output_step_image(context, name, img):
-    output_path = context['output_path']
+    if not context['debug']:
+        return
+
+    output_path = context['debug_output_path']
     section = context.get('section', 'full')
     
     section_output_path = os.path.join(output_path, section)
