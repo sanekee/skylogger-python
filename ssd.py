@@ -309,7 +309,7 @@ def is_panel(rows):
     return True
 
 
-def group(boxes, threshold = 10):
+def group(boxes, threshold = 0):
     boxes = sorted(boxes, key=lambda b: b[1])  # Sort by y
 
     rows = []
