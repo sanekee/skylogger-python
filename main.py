@@ -3,7 +3,7 @@ import shutil
 import cv2
 import argparse
 import re
-import numpy as np
+import csv
 
 from ssd import detect_ssd
 
@@ -103,7 +103,24 @@ def process_video(args: object, masks: dict) -> dict:
     
     cur_sec = skip
 
-    csv = []
+    outFile = os.path.join(output_path, 'results.csv')
+    resf = open(outFile, 'w')
+    res_writer = csv.writer(resf, delimiter=',')
+    res_writer.writerow(['frame','temperature','profile','power','fan','time','mode'])
+
+    trnf = any
+    trn_writer = any
+    debug_path = os.path.join(output_path, 'debug')
+
+    if args.training:
+        training_path = os.path.join(output_path, 'training')
+        training_gt_path = os.path.join(training_path, 'gt.txt')
+
+        os.makedirs(training_path, exist_ok=True)
+
+        trnf = open(training_gt_path, 'w')
+        trn_writer = csv.writer(trnf, delimiter='\t')
+
     while True:
         video.set(cv2.CAP_PROP_POS_MSEC, cur_sec * 1000)
         ret, frame = video.read()
@@ -111,10 +128,43 @@ def process_video(args: object, masks: dict) -> dict:
         if not ret:
             break
 
-        res = process_image(frame, rotate, f"frame_{cur_sec}", output_path, masks, debug)
+        line = process_image(frame, rotate, f"frame_{cur_sec}", output_path, masks, debug)
 
-        if res:
-            csv.append(res)
+        if line and 'results' in line.keys():
+            res = line['results']
+
+            if 'TEMP' in res.keys() \
+                and 'PROFILE' in res.keys() \
+                and 'POWER' in res.keys() \
+                and 'FAN' in res.keys() \
+                and 'TIME' in res.keys():
+                res_writer.writerow([re.sub("[^0-9]", "", line['filename']), 
+                    res['TEMP'],
+                    res['PROFILE'],
+                    res['POWER'],
+                    res['FAN'],
+                    res['TIME'],
+                    res['MODE']])
+                
+                if args.training:
+                    # frame_name = re.sub("[^0-9]", "", line['filename'])
+                    frame_name = line['filename']
+                    frame_path = os.path.join(debug_path, frame_name)
+                    steps_path = os.path.join(frame_path, 'steps')
+
+                    for idx, label in enumerate(['TEMP', 'PROFILE', 'POWER', 'FAN', 'TIME']):
+                        step_file = os.path.join(steps_path, f'3-{idx}-monitor-{label}-orig.png')
+                        dest_filename = f'{frame_name}-{label}.png'
+                        dest_file = os.path.join(training_path, dest_filename)
+                        shutil.copy(step_file, dest_file)
+                    
+                        val = res[label]
+                        if label == 'TIME' and val.strip( )== ':':
+                            val = "- - - -"
+
+                        trn_writer.writerow([dest_filename, val])
+            
+
 
         if count > 0:
             num_frames = num_frames - 1
@@ -123,8 +173,13 @@ def process_video(args: object, masks: dict) -> dict:
 
         cur_sec += interval
 
+    if trnf:
+        trnf.close()
+
+    if resf:
+        resf.close()
+
     video.release()
-    return csv
 
 
 def main(args):
@@ -143,30 +198,13 @@ def main(args):
     shutil.rmtree(output_path, ignore_errors=True)
     os.makedirs(output_path, exist_ok=True)
 
-    csv = []
     if not os.path.isfile(input_path):
         print(f"input file not found: {input_path}")
         return
 
     masks = load_segment_masks(masks_path)
 
-    csv = process_video(args, masks)
-
-    if not csv:
-        return
-
-    outFile = os.path.join(output_path, 'results.csv')
-    with open(outFile, 'w') as f:
-        f.write('frame,temperature,profile,power,fan,time,mode\n')
-        for line in csv:
-            f.write(re.sub("[^0-9]", "", line['filename']) + ',')
-            if line['results']:
-                res = line['results']
-                f.write(f"{res['TEMP']},{res['PROFILE']},{res['POWER']},{res['FAN']},{res['TIME']},{res['MODE']}")
-            f.write('\n')
-
-        f.write('\n')
-        f.close()
+    process_video(args, masks)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process images from input path and save to output path.")
@@ -178,7 +216,10 @@ if __name__ == "__main__":
     parser.add_argument('--interval', type=int, default=30, required=False, help="Processing Interval.")
     parser.add_argument('--rotate', type=str, default='auto', required=False, help="Rotation (auto|<degree>).")
     parser.add_argument('--debug', type=bool, default=False, required=False, help="Write debug image")
+    parser.add_argument('--training', type=bool, default=False, required=False, help="Write debug & tensorflow training data")
     
     args = parser.parse_args()
+
+    args.debug = args.debug or args.training
 
     main(args)

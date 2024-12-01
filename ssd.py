@@ -199,6 +199,7 @@ def detect_ssd(context):
         
 
     results = {
+        'FRAME': context['section'],
         'MODE': ''
     }
 
@@ -245,10 +246,17 @@ def detect_ssd(context):
         monitor_img = extract_box(context['threshold'], monitor_box)
         output_step_image(context, f'3-{idx}-monitor-{label}', monitor_img)
 
+        monitor_img_orig = extract_box(context['image'], monitor_box)
+        output_step_image(context, f'3-{idx}-monitor-{label}-orig', monitor_img_orig)
+
         digits = extract_digits(monitor_img, settings)
 
         value = ''
         for didx, digit in enumerate(digits):
+            if label == 'TIME' and didx == 2:
+                value += ':'
+                continue
+
             digit_image, rank, digit_rect = detect_ssd_digit(context, digit['image'])
 
             if digit_image is not None:
