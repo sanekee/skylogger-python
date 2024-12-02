@@ -153,7 +153,7 @@ def process_video(args: object, masks: dict) -> dict:
                     steps_path = os.path.join(frame_path, 'steps')
 
                     for idx, label in enumerate(['TEMP', 'PROFILE', 'POWER', 'FAN', 'TIME']):
-                        step_file = os.path.join(steps_path, f'3-{idx}-monitor-{label}-orig.png')
+                        step_file = os.path.join(steps_path, f'3-monitor-{label}-orig.png')
                         dest_filename = f'{frame_name}-{label}.png'
                         dest_file = os.path.join(training_path, dest_filename)
                         shutil.copy(step_file, dest_file)

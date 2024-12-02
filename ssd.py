@@ -1,5 +1,7 @@
+import math
 import os
 import cv2
+import numpy as np
 
 # segment pattern
 digit_segments = [
@@ -41,7 +43,9 @@ panel_monitors = {
                 'start': 66,
                 'width': 34,
             }
-        ]
+        ],
+        'center_angle': -150.26,
+        'center_ratio': 5.2
     },
     "PROFILE": {
         'num_digits': 3,    
@@ -59,7 +63,9 @@ panel_monitors = {
                 'start': 66,
                 'width': 34,
             }
-        ]
+        ],
+        'center_angle': -51.27,
+        'center_ratio': 3.24
     },
     "POWER": {
         'num_digits': 3,    
@@ -77,7 +83,9 @@ panel_monitors = {
                 'start': 66,
                 'width': 34,
             }
-        ]
+        ],
+        'center_angle': 0,
+        'center_ratio': 0
     },
     "FAN": {
         'num_digits': 3,    
@@ -95,7 +103,9 @@ panel_monitors = {
                 'start': 66,
                 'width': 34,
             }
-        ]
+        ],
+        'center_angle': 1.01,
+        'center_ratio': 5.25
     },
     "TIME": {
         'num_digits': 4,
@@ -122,7 +132,9 @@ panel_monitors = {
                 'start': 76,
                 'width': 24,
             }
-        ]
+        ],
+        'center_angle': 166.51,
+        'center_ratio': 5.01
     },
     "MODE": {
         'num_digits': 1,
@@ -134,8 +146,50 @@ panel_monitors = {
             },
         ]
     },
+    "ROAST_MODE": {
+        'num_digits': 1,
+        'index': 6,
+        'digits': [
+            {
+                'start': 0,
+                'width': 100,
+            },
+        ],
+        'center_angle': 89.02,
+        'center_ratio': 4.59
+    },
+    "PREHEAT_MODE": {
+        'num_digits': 1,
+        'index': 7,
+        'digits': [
+            {
+                'start': 0,
+                'width': 100,
+            },
+        ],
+        'center_angle': 116.5,
+        'center_ratio': 5.0,
+    },
+    "COOL_MODE": {
+        'num_digits': 1,
+        'index': 8,
+        'digits': [
+            {
+                'start': 0,
+                'width': 100,
+            },
+        ],
+        'center_angle': 60.62,
+        'center_ratio': 5.38
+    },
 }
 
+class MonitorData:
+    def __init__(self, box, label, settings):
+        self.box = box
+        self.label = label
+        self.settings = settings
+    
 def detect_ssd(context):
     """
     Detect SSD - detect skywalker roaster seven segment display from image capture
@@ -168,27 +222,27 @@ def detect_ssd(context):
     for ridx, row in enumerate(rows):
         output_step(context, f'1-row-{ridx}', row)
     
-
     rows = merge(rows)
 
     for ridx, row in enumerate(rows):
         output_step(context, f'2-row-{ridx}', row)
     
-    if not is_panel(rows):
+    monitor_boxes = [item for row in rows for item in row]
+
+    connect_boxes(context, monitor_boxes)
+
+    monitor_data = build_monitor_data(context, monitor_boxes)
+    # if not is_panel(rows):
+    #     return None
+    if len(monitor_data) < 5:
         return None
-
-    monitor_data = [item for row in rows for item in row]
-
-    labels = sorted(panel_monitors .keys(), key=lambda k: panel_monitors [k]['index'])
 
     max_width = 0
     max_height = 1
-    for idx, m in enumerate(monitor_data):
-        if idx >= len(labels):
-            break
-        label = labels[idx]
-        settings = panel_monitors[label]
-        x, y, w, h = m
+    for label, data in monitor_data.items():
+        settings = data.settings
+
+        x, y, w, h = data.box
         if settings['num_digits'] != 3:
             continue
 
@@ -197,30 +251,23 @@ def detect_ssd(context):
         max_width = max(max_width, dig_width)
         max_height = max(max_height, h)
         
-
     results = {
         'FRAME': context['section'],
         'MODE': ''
     }
 
-    # check all monitors exists (except mode)
-    if len(monitor_data) < (len(labels) - 1):
-        return None
-
-    for idx, box in enumerate(monitor_data):
-        if idx >= len(labels):
-            break
+    idx = 0
+    for label, data in monitor_data.items():
+        box = data.box
         
-        label = labels[idx]
-        settings = panel_monitors[label]
+        settings = data.settings
 
-        if label == 'MODE':
-            if box[0] > monitor_data[1][0]:
-                results[label] = 'COOL'
-            elif box[0] > monitor_data[2][0]:
-                results[label] = 'ROAST'
-            else:
-                results[label] = 'PREHEAT'
+        if label in ['PREHEAT_MODE', 'ROAST_MODE', 'COOL_MODE']:
+            value = label.removesuffix('_MODE')
+            results['MODE'] = value
+
+            cv2.rectangle(context['diag_image'], box, (0, 255, 255), 2)
+            cv2.putText(context['diag_image'], f'MODE: {value}', (box[0], box[1] + box[3] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
             continue
 
         extra = 0
@@ -244,10 +291,10 @@ def detect_ssd(context):
             continue
 
         monitor_img = extract_box(context['threshold'], monitor_box)
-        output_step_image(context, f'3-{idx}-monitor-{label}', monitor_img)
+        output_step_image(context, f'3-monitor-{label}', monitor_img)
 
         monitor_img_orig = extract_box(context['image'], monitor_box)
-        output_step_image(context, f'3-{idx}-monitor-{label}-orig', monitor_img_orig)
+        output_step_image(context, f'3-monitor-{label}-orig', monitor_img_orig)
 
         digits = extract_digits(monitor_img, settings)
 
@@ -260,7 +307,7 @@ def detect_ssd(context):
             digit_image, rank, digit_rect = detect_ssd_digit(context, digit['image'])
 
             if digit_image is not None:
-                output_step_image(context, f'3-{idx}-monitor-{label}-digit-{didx}', digit_image)
+                output_step_image(context, f'3-monitor-{label}-digit-{didx}', digit_image)
 
                 dx = monitor_box[0] + digit['rect'][0]
                 dy = monitor_box[1] + digit['rect'][1]
@@ -536,3 +583,131 @@ def sanitize(image):
     new_h = max(boxes_yh[-1][1] + boxes_yh[-1][3], int(0.80 * image.shape[0])) - new_y
 
     return image.copy()[new_y:new_y+new_h, new_x:new_x+new_w], [new_x, new_y, new_w, new_h]
+
+def rect_center(r) -> list:
+    x, y, w, h = r
+    wmax = max(w, h * 2)
+    xmin = x + w - wmax
+    xmin = min(xmin, x)
+    return (xmin + wmax // 2, y + h // 2)
+
+def find_central_box_index(boxes):
+    centers = np.array([rect_center(box) for box in boxes])
+
+    centroid = np.mean(centers, axis=0)
+
+    distances = np.linalg.norm(centers - centroid, axis=1)
+    closest_index = np.argmin(distances)
+    return closest_index
+
+
+def calculate_p2(box1, ratio, angle):
+    x1, y1, w1, h1 = box1
+    px, py = rect_center(box1) 
+
+    wmax = max(w1, h1*2)
+    xmin = x1 + w1 - wmax
+    xmin = min(x1, xmin)
+    angle_radians = math.radians(angle)
+    dx = h1 * ratio * math.cos(angle_radians)
+    dy = h1 * ratio * math.sin(angle_radians)
+    return (int(px + dx), int(py + dy))
+
+def find_box2(pt2, boxes):
+    px, py = pt2 
+    for box in boxes:
+        x, y, w, h = box
+        wmax = max(w, h*2)
+        xmin = x + w - wmax
+        xmin = min(x, xmin)
+        if xmin <= px <= xmin + wmax and \
+            y <= py <= y + h:
+            return box
+
+    return None
+
+
+def build_monitor_data(context, boxes) -> dict[str, MonitorData]:
+    ret = {}
+    cidx = find_central_box_index(boxes)
+    box1 = boxes[cidx]
+
+    x1,y1,w1,h1 = box1
+    center1 = rect_center(box1)
+
+    ret['POWER'] = MonitorData(box1, 'POWER', panel_monitors['POWER'])
+    
+    for k, settings in panel_monitors.items():
+        if k == 'POWER':
+            continue
+
+        if not 'center_ratio' in settings.keys() or \
+            not 'center_angle' in settings.keys():
+            continue
+
+        pt_check = calculate_p2(box1, settings['center_ratio'], settings['center_angle'])
+
+        box2 = find_box2(pt_check, boxes)
+
+        if box2 is None:
+            continue
+
+        x2, y2, w2, h2 = box2
+        center2 = rect_center(box2) 
+
+        cv2.line(context['diag_image'], center1, center2, (0, 255, 0), 2)
+        cv2.line(context['diag_image'], center1, pt_check, (0, 255, 255), 1)
+
+        # Calculate details
+        line_length = int(math.sqrt((center2[0] - center1[0]) ** 2 + (center2[1] - center1[1]) ** 2))
+        ratio = round(line_length / h1, 2)
+        angle = round(calculate_angle(center1, center2), 2)
+
+        # Text to display
+        text = f"L:{line_length}, R:{ratio}, A:{angle}"
+
+        # Calculate midpoint and put text
+        mid_pt = midpoint(center1, center2)
+        cv2.putText(context['diag_image'], text, mid_pt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+
+        ret[k] = MonitorData(box2, k, settings)
+
+    return ret
+
+def calculate_angle(pt1, pt2):
+    delta_x = pt2[0] - pt1[0]
+    delta_y = pt2[1] - pt1[1]
+    return math.degrees(math.atan2(delta_y, delta_x))
+
+def midpoint(pt1, pt2):
+    return ((pt1[0] + pt2[0]) // 2, (pt1[1] + pt2[1]) // 2)
+
+def connect_boxes(context, boxes):
+    cidx = find_central_box_index(boxes)
+    box1 = boxes[cidx]
+
+    x1,y1,w1,h1 = box1
+    center1 = rect_center(box1)
+    
+    for i, box in enumerate(boxes):
+        if i == cidx:
+            continue
+
+        x2, y2, w2, h2 = box
+        center2 = rect_center(box) 
+
+        cv2.line(context['diag_image'], center1, center2, (188, 255, 188), 1)
+
+        # Calculate details
+        line_length = int(math.sqrt((center2[0] - center1[0]) ** 2 + (center2[1] - center1[1]) ** 2))
+        ratio = round(line_length / h1, 2)
+        angle = round(calculate_angle(center1, center2), 2)
+
+        # Text to display
+        text1 = f"L:{line_length}, R:{ratio}, A:{angle}"
+        text2 = f"Pt2:{center2[0]},{center2[1]}"
+
+        # Calculate midpoint and put text
+        mid_pt = midpoint(center1, center2)
+        cv2.putText(context['diag_image'], text1, mid_pt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (188, 255, 255), 1)
+        cv2.putText(context['diag_image'], text2, (mid_pt[0], mid_pt[1] + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (188, 255, 255), 1)
