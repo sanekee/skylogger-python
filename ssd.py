@@ -229,6 +229,9 @@ def detect_ssd(context):
     
     monitor_boxes = [item for row in rows for item in row]
 
+    for box in monitor_boxes:
+        cv2.rectangle(context['diag_image'], box, (255, 255, 188), 1)
+
     connect_boxes(context, monitor_boxes)
 
     monitor_data = build_monitor_data(context, monitor_boxes)
@@ -293,12 +296,11 @@ def detect_ssd(context):
         monitor_img = extract_box(context['threshold'], monitor_box)
         output_step_image(context, f'3-monitor-{label}', monitor_img)
 
-        monitor_img_orig = extract_box(context['image'], monitor_box)
-        output_step_image(context, f'3-monitor-{label}-orig', monitor_img_orig)
-
         digits = extract_digits(monitor_img, settings)
 
         value = ''
+        training_box = monitor_box
+
         for didx, digit in enumerate(digits):
             if label == 'TIME' and didx == 2:
                 value += ':'
@@ -320,12 +322,21 @@ def detect_ssd(context):
                 dw = digit_rect[2]
                 dh = digit_rect[3]
                 cv2.rectangle(context['diag_image'], [dx, dy, dw, dh], (0, 255, 255), 2)
+            else:
+                training_box[0] += digit['rect'][2]
+                training_box[2] -= digit['rect'][2]
+
             
             if rank:
                 value += digits_map[rank[0]['digit']]
             else:
                 if value != '':
                     value += '_'
+
+        training_img = extract_box(context['threshold'], training_box)
+        training_img = cv2.bitwise_not(training_img)
+        output_step_image(context, f'3-monitor-{label}-training', training_img)
+
 
         cv2.putText(context['diag_image'], f'{label}: {value}', (monitor_box[0], monitor_box[1] + monitor_box[3] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         results[label] = value

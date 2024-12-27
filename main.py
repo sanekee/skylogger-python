@@ -119,7 +119,7 @@ def process_video(args: object, masks: dict) -> dict:
         os.makedirs(training_path, exist_ok=True)
 
         trnf = open(training_gt_path, 'w')
-        trn_writer = csv.writer(trnf, delimiter='\t')
+        trn_writer = csv.writer(trnf, delimiter=',')
 
     while True:
         video.set(cv2.CAP_PROP_POS_MSEC, cur_sec * 1000)
@@ -153,9 +153,11 @@ def process_video(args: object, masks: dict) -> dict:
                     steps_path = os.path.join(frame_path, 'steps')
 
                     for idx, label in enumerate(['TEMP', 'PROFILE', 'POWER', 'FAN', 'TIME']):
-                        step_file = os.path.join(steps_path, f'3-monitor-{label}-orig.png')
+                        step_file = os.path.join(steps_path, f'3-monitor-{label}-training.png')
                         dest_filename = f'{frame_name}-{label}.png'
                         dest_file = os.path.join(training_path, dest_filename)
+                        gt_filename = f'{frame_name}-{label}.gt.txt'
+                        gt_file = os.path.join(training_path, gt_filename)
                         shutil.copy(step_file, dest_file)
                     
                         val = res[label]
@@ -163,9 +165,10 @@ def process_video(args: object, masks: dict) -> dict:
                             val = "- - - -"
 
                         trn_writer.writerow([dest_filename, val])
-            
-
-
+                        with open(gt_file, 'w') as f:
+                            f.write(val)
+                            f.close()
+                        
         if count > 0:
             num_frames = num_frames - 1
             if num_frames == 0:
