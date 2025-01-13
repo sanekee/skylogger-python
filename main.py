@@ -176,7 +176,7 @@ def process_video(args: object, masks: dict) -> dict:
 
         cur_sec += interval
 
-    if trnf:
+    if args.training and trnf:
         trnf.close()
 
     if resf:
