@@ -1,11 +1,13 @@
 
 import math
-from typing import List
+from typing import List, Optional
 from cv2 import Mat
 import cv2
+from aoi import find_aoi, group_aoi
 from context import FrameContext
-from debug import debug_displays
-from utils import calculate_angle, calculate_p2, find_box2, find_central_box_index, group, merge, rect_center
+from debug import _debug_boxes, _debug_displays, _debug_projection
+from display import Digit, Display
+from utils import calculate_projection, find_central_box_index, find_projection_rect_index
 
 
 class Section:
@@ -13,11 +15,6 @@ class Section:
         self.name = name
         self.angle = angle
         self.length = length
-
-class Display:
-    def __init__(self, name: str, rect: list):
-        self.name = name
-        self.rect = rect
 
 class Result:
     def __init__(self, name: str, temperature: int, profile: int, power: int, fan: int, time: str, mode: str):
@@ -39,74 +36,77 @@ class SkyWalker():
 
     def __init_sections(self):
         self.__sections = {
-            "TEMPERATURE": Section("TEMPERATURE", -149.265, 5.2),
-            "PROFILE": Section("PROFILE", -50.26, 3.24),
+            "TEMPERATURE": Section("TEMPERATURE", -149.85, 4.91),
+            "PROFILE": Section("PROFILE", -51.16, 2.92),
             "POWER": Section("POWER", 0, 0),
-            "FAN": Section("FAN", 0.0, 5.25),
-            "TIME": Section("TIME", 165.50, 5.0),
-            "MODE_PREHEAT": Section("MODE_PREHEAT", 115.49, 5.0),
-            "MODE_ROAST": Section("MODE_ROAST", 88.01, 4.59),
-            "MODE_COOL": Section("MODE_COOL", 59.01, 51.38),
+            "FAN": Section("FAN", 0.0, 4.67),
+            "TIME": Section("TIME", 165.21, 4.48),
+            "MODE_PREHEAT": Section("MODE_PREHEAT", 115.20, 5.0), ## recheck
+            "MODE_ROAST": Section("MODE_ROAST", 84.61, 4.08),
+            "MODE_COOL": Section("MODE_COOL", 59.01, 51.38), ## recheck
         }
 
     def __preprocess_image(self) -> Mat:
         ctx = self.ctx
         gray_image = cv2.cvtColor(ctx.image, cv2.COLOR_BGR2GRAY)
-        _, threshold = cv2.threshold(gray_image, 200, 255, cv2.THRESH_BINARY) 
-        return threshold
 
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10))  # Adjust size
+        dilated_image = cv2.dilate(gray_image, kernel, iterations=1)
 
-    def __find_aoi(self, image: Mat) -> list:
-        def filter_area(contours, min):
-            for c in contours:
-                if cv2.contourArea(c) > min:
-                    yield c
+        _, threshold_image = cv2.threshold(dilated_image, 200, 255, cv2.THRESH_BINARY) 
 
-        contours, _ = cv2.findContours( 
-            image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE) 
-
-        contours = filter_area(contours, 50)
-
-        boxes = [cv2.boundingRect(c) for c in contours]
-
-        rows = group(boxes)
-        rows = merge(rows)
-
-        return [item for row in rows for item in row]
-
+        return threshold_image
 
     def __detect_displays(self, threshold_image) -> List[Display]:
-        boxes = self.__find_aoi(threshold_image)
+        aois = find_aoi(threshold_image, 30)
+
+        if not aois or len(aois) == 0:
+            return None
 
         displays: dict[str, Display]= {}
 
-        cidx = find_central_box_index(boxes)
-        box1 = boxes[cidx]
+        cidx = find_central_box_index([aoi.rect for aoi in aois])
+        aoi = aois[cidx]
 
-        displays['POWER'] = Display('POWER', box1)
+        displays['POWER'] = Display(self.ctx, 'POWER', aoi.rect, [Digit(self.ctx, 'POWER', i, rect) for i, rect in enumerate(aoi.items)])
         
+        rects = [aoi.rect for aoi in aois]
+
+        if self.ctx.options.debug:
+            _debug_projection(self.ctx, rects)
+
         for section in self.__sections.values():
             if section.name == 'POWER':
                 continue
 
-            pt_check = calculate_p2(box1, section.length, section.angle)
-            box2 = find_box2(pt_check, boxes)
+            pt_check = calculate_projection(aoi.rect, section.length, section.angle)
+            idx2 = find_projection_rect_index(pt_check, rects)
 
-            if box2 is None:
+            if idx2 is None:
                 continue
 
-            displays[section.name] = Display(section.name, box2)
+            aoi2 = aois[idx2]
+            displays[section.name] = Display(self.ctx, section.name, aoi2.rect, [Digit(self.ctx, section.name, i, rect) for i, rect in enumerate(aoi2.items)])
 
         return displays
 
-    def detect(self) -> Result:
-        threshold_image = self.__preprocess_image()
+    def detect(self) -> Optional[Result]:
+        processed_image = self.__preprocess_image()
 
-        displays = self.__detect_displays(threshold_image)
+        displays = self.__detect_displays(processed_image)
+
+        if not displays:
+            return None
+
+        if not displays["POWER"]:
+            return None
 
         ctx = self.ctx
         if ctx.options.debug:
-            if displays["POWER"]:
-                debug_displays(ctx, {key: disp.rect for key, disp in displays.items()})
+            _debug_displays(ctx, {key: disp.rect for key, disp in displays.items()})
+            ctx._new_debug()
+                
+        for display in displays.values():
+            print(f'{display.name}: {display.detect()}')
 
         return None

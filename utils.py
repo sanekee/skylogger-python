@@ -1,16 +1,13 @@
 
 import math
+from typing import Optional, Tuple
 import numpy as np
 
-def rect_center(r) -> list:
-    x, y, w, h = r
-    wmax = max(w, h * 2)
-    xmin = x + w - wmax
-    xmin = min(xmin, x)
-    return (xmin + wmax // 2, y + h // 2)
+from aoi import Rect
 
-def find_central_box_index(boxes):
-    centers = np.array([rect_center(box) for box in boxes])
+
+def find_central_box_index(rects: list[Rect]):
+    centers = np.array([rect.center() for rect in rects])
 
     centroid = np.mean(centers, axis=0)
 
@@ -19,9 +16,9 @@ def find_central_box_index(boxes):
     return closest_index
 
 
-def calculate_p2(box1, ratio, angle):
-    x1, y1, w1, h1 = box1
-    px, py = rect_center(box1) 
+def calculate_projection(rect: Rect, ratio: float, angle: float) -> Tuple[int, int]:
+    x1, y1, w1, h1 = rect.to_list()
+    px, py = rect.center()
 
     wmax = max(w1, h1*2)
     xmin = x1 + w1 - wmax
@@ -31,16 +28,16 @@ def calculate_p2(box1, ratio, angle):
     dy = h1 * ratio * math.sin(angle_radians)
     return (int(px + dx), int(py + dy))
 
-def find_box2(pt2, boxes):
+def find_projection_rect_index(pt2: Tuple[int, int], rects: list[Rect]) -> Optional[int]:
     px, py = pt2 
-    for box in boxes:
-        x, y, w, h = box
+    for i, rect in enumerate(rects):
+        x, y, w, h = rect.to_list()
         wmax = max(w, h*2)
         xmin = x + w - wmax
         xmin = min(x, xmin)
         if xmin <= px <= xmin + wmax and \
             y <= py <= y + h:
-            return box
+            return i
 
     return None
 
@@ -103,6 +100,38 @@ def group(boxes, threshold = 0):
 
 
     return rows
+
+def merge(rows, xthreshold = 100, ythreshold = 100):
+    groups = []
+    for row in rows:
+        new_row = []
+
+        row_x, row_y, row_w, row_h = [0, 0, 0, 0]
+        for item in row:
+            x, y, w, h = item
+            x2 = x + w
+            y2 = y + h
+
+            if not new_row:
+                new_row.append([x,y,w,h])
+                row_x, row_y, row_w, row_h = x, y, w, h
+            else:
+                current_box = new_row[-1]
+                prev_x2 = row_x + row_w
+                prev_y2 = row_y + row_h
+                if (y - row_y) <= ythreshold and (x - prev_x2) <= xthreshold:
+                    current_box[2] = max((x + w), prev_x2) - current_box[0]
+                    current_y = current_box[1]
+                    current_box[1] = min(current_box[1], y)
+                    current_box[3] = max(prev_y2, y2) - min(current_box[1], current_y)
+                    row_x, row_y, row_w, row_h = current_box
+                else:
+                    new_row.append([x,y,w,h])
+                    row_x, row_y, row_w, row_h = x, y, w, h
+
+        groups.append(new_row)
+
+    return groups
 
 def merge(rows, xthreshold = 100, ythreshold = 100):
     groups = []
