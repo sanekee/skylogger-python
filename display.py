@@ -95,7 +95,7 @@ class Display:
             self.digits = new_digits
 
         if len(self.digits) == 3: # case where 01:23 1:2 merged in a digit zone
-            print(f'{self.ctx.name}-{self.name}: splitting digit')
+            _debug(self.ctx, lambda: print(f'{self.ctx.name}-{self.name}: splitting digit'))
 
             new_digits: list[Rect] = [self.digits[0]]
             digit = self.digits[1]
@@ -133,7 +133,7 @@ class Display:
 
             # if not -
             if digit.rect.h >= 0.8 * height:
-                print(f'{self.ctx.name}-{self.name}: fixing digit 1 width')
+                _debug(self.ctx, lambda: print(f'{self.ctx.name}-{self.name}: fixing digit 1 width'))
 
                 new_digits: list[Rect] = [self.digits[0]]
 

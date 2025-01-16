@@ -44,9 +44,10 @@ class Context:
 
         os.makedirs(self.settings.output_path, exist_ok=True)
 
+        self.__debug_path = ''
         if self.options.debug:
-            self._debug_path = os.path.join(self.settings.output_path, '_debug')
+            self.__debug_path = os.path.join(self.settings.output_path, '_debug')
         
 
     def new_frame_context(self, name: str, image: cv2.Mat):
-        return FrameContext(name, image, self.options, self._debug_path)
+        return FrameContext(name, image, self.options, self.__debug_path)

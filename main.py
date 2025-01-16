@@ -113,8 +113,4 @@ if __name__ == "__main__":
     parser.add_argument('--rotate', type=str, default='auto', required=False, help="Rotation (auto|<degree>).")
     parser.add_argument('--debug', type=bool, default=False, required=False, help="Write debug image")
     
-    args = parser.parse_args()
-
-    args.debug = args.debug or args.training
-
-    main(args)
+    main(parser.parse_args())

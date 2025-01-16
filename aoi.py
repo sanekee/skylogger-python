@@ -95,7 +95,7 @@ def find_aoi(ctx: FrameContext, image: cv2.Mat, minArea: int = 50, xThreshold: i
             else:
                 if is_nearby_x(cur_aoi.rect, rect):
                     if cur_aoi.rect.overlapped(rect) > 0.8:
-                        print('skip overlapped rect')
+                        _debug(ctx, lambda: print('skip overlapped rect'))
                     else:
                         cur_aoi.group(rect)
                 else:
