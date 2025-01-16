@@ -30,7 +30,6 @@ def process_image(ctx: FrameContext) -> Optional[SkywalkerResult]:
             image = cv2.transpose(image, degree)
             image = cv2.flip(image, 0)
 
-
         res = SkyWalker(ctx).detect()
         if res is not None:
             return res
@@ -63,7 +62,7 @@ def process_video(ctx: Context):
         line = process_image(ctx.new_frame_context(f"frame_{cur_sec}", frame))
 
         if line is not None:
-            results.append(convert_result(line))
+            results.append(convert_result(f'frame_{cur_sec}', line))
 
         if options.count > 0:
             num_frames = num_frames - 1
@@ -75,7 +74,6 @@ def process_video(ctx: Context):
     video.release()
 
     ctx.write_result(results)
-
 
 def main(args):
     input_path = args.input_path

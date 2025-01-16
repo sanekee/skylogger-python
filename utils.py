@@ -171,3 +171,6 @@ def extract_box(image, box):
     roi = image.copy()[y:y+h, x:x+w]
 
     return roi
+
+def area(width: int, height: int) -> int:
+    return width * height

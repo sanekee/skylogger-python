@@ -34,6 +34,8 @@ class FrameContext:
         self.options = options
         self.image = image
 
+        self.__step_counter = 1
+
         if self.options.debug:
             self.__debug_dir = os.path.join(debug_path, name)
             os.makedirs(self.__debug_dir, exist_ok=True)
@@ -54,11 +56,12 @@ class FrameContext:
     def _get_debug_image(self) -> cv2.Mat:
         return self.__debugs[len(self.__debugs) - 1]._image
 
-    def _write_step(self, path: str, filename: str, image: cv2.Mat):
-        output_dir = os.path.join(self.__debug_dir, path)
+    def _write_step(self, filename: str, image: cv2.Mat):
+        output_dir = os.path.join(self.__debug_dir, "_steps")
         os.makedirs(output_dir, exist_ok=True)
-        output_path = os.path.join(output_dir, filename)
+        output_path = os.path.join(output_dir, f'{self.__step_counter}-{filename}.png')
         cv2.imwrite(output_path, image)
+        self.__step_counter += 1
 
 
 

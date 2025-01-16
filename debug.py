@@ -37,7 +37,7 @@ def _debug_projection(ctx: FrameContext, rects: list[Rect]):
         cv2.line(img, center1, center2, color2, 1)
         cv2.putText(img, text, mid_pt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color2, 1)
 
-        ctx._write_step("steps", "1-projection.png", img)
+    ctx._write_step("projection", img)
 
 
 def _debug_displays(ctx: FrameContext, rects: dict[str, Rect]):
