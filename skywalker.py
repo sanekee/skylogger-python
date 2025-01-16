@@ -1,11 +1,9 @@
 
-import math
-from typing import List, Optional
-from cv2 import Mat
+from typing import Optional
 import cv2
 from aoi import find_aoi
 from context import FrameContext
-from debug import _debug_displays, _debug_projection
+from debug import _debug, _debug_displays, _debug_projection
 from display import Digit, Display
 from utils import calculate_projection, find_central_box_index, find_projection_rect_index
 
@@ -45,18 +43,18 @@ class SkyWalker():
             "MODE_COOL": Section("MODE_COOL", 54.85, 4.77, True),
         }
 
-    def __preprocess_image(self) -> Mat:
+    def __preprocess_image(self) -> cv2.Mat:
         ctx = self.ctx
         gray_image = cv2.cvtColor(ctx.image, cv2.COLOR_BGR2GRAY)
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10))  # Adjust size
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10)) 
         dilated_image = cv2.dilate(gray_image, kernel, iterations=1)
 
         _, threshold_image = cv2.threshold(dilated_image, 200, 255, cv2.THRESH_BINARY) 
 
         return threshold_image
 
-    def __detect_displays(self, threshold_image) -> List[Display]:
+    def __detect_displays(self, threshold_image) -> list[Display]:
         aois = find_aoi(self.ctx, threshold_image, 100)
 
         if not aois or len(aois) == 0:
@@ -70,8 +68,8 @@ class SkyWalker():
         displays['POWER'] = Display(self.ctx, 'POWER', aoi.rect, [Digit(self.ctx, 'POWER', i, rect) for i, rect in enumerate(aoi.items)])
         
         rects = [aoi.rect for aoi in aois]
-        if self.ctx.options.debug:
-            _debug_projection(self.ctx, rects)
+        
+        _debug(self.ctx, lambda: _debug_projection(self.ctx, rects))
 
         for section in self.__sections.values():
             if section.name == 'POWER':
@@ -142,17 +140,14 @@ class SkyWalker():
         if not 'POWER' in displays:
             print('skywalker power display not found')
             return None
-
-        ctx = self.ctx
-        if ctx.options.debug:
-            _debug_displays(ctx, {key: disp.rect for key, disp in displays.items()})
-            ctx._new_debug()
+        
+        _debug(self.ctx, lambda: _debug_displays(self.ctx, {key: disp.rect for key, disp in displays.items()}))
                 
         res:Result = Result(self.ctx.name)
         for display in displays.values():
             if not display.skip_detect:
                 value = display.detect()
-                print(f'{self.ctx.name}-{display.name}: {value}')
+                _debug(self.ctx, lambda: print(f'{self.ctx.name}-{display.name}: {value}'))
 
             try:
                 match display.name:

@@ -107,13 +107,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process images from input path and save to output path.")
     parser.add_argument('input_path', type=str, help="Path to the input images directory or video file.")
     parser.add_argument('output_path', type=str, help="Path to the output (and debug) directory.")
-    parser.add_argument('--masks_path', type=str, default='./masks', required=False, help="Path to the sevent segment display mask.")
     parser.add_argument('--skip', type=int, default=0, required=False, help="Skip number of seconds.")
     parser.add_argument('--count', type=int, default=0, required=False, help="Number of frames to process.")
     parser.add_argument('--interval', type=int, default=30, required=False, help="Processing Interval.")
     parser.add_argument('--rotate', type=str, default='auto', required=False, help="Rotation (auto|<degree>).")
     parser.add_argument('--debug', type=bool, default=False, required=False, help="Write debug image")
-    parser.add_argument('--training', type=bool, default=False, required=False, help="Write debug & tensorflow training data")
     
     args = parser.parse_args()
 

@@ -2,6 +2,7 @@
 from typing import Callable
 import cv2
 from context import FrameContext
+from debug import _debug
 from utils import area
 
 
@@ -105,8 +106,7 @@ class SSD:
     def detect(cls, ctx: FrameContext, name:str, idx: int, image: cv2.Mat) -> str:
         processed_image = SSD.__preprocess_image(image)
 
-        if ctx.options.debug:
-            ctx._write_step(f'{name}-{idx}', processed_image)
+        ctx._write_step(f'{name}-{idx}', processed_image)
            
         segments = ''
         i = 0
@@ -120,17 +120,18 @@ class SSD:
             boxes = zone.filter(zone_image, boxes)
             segments += '1' if len(boxes) > 0 else '0'
 
-            if ctx.options.debug:
+            def __debug_zone():
                 box_image = zone.extract(image.copy())
                 [cv2.rectangle(box_image, box, (0, 255, 0), 1) for box in boxes]
                 if len(boxes) == 0:
                     [cv2.rectangle(box_image, box, (0, 0, 255), 2) for box in orig_boxes]
                 ctx._write_step(f'{name}-{idx}-{zone.name}', box_image)
 
+            _debug(ctx, lambda: __debug_zone())
+
             i+=1
         
-        if ctx.options.debug:
-            print(f'{ctx.name}-{name}-{idx} pattern {segments}')
+        _debug(ctx, lambda: print(f'{ctx.name}-{name}-{idx} pattern {segments}'))
 
         if segments in cls.__patterns:
             return cls.__patterns[segments]

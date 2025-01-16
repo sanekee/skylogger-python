@@ -1,10 +1,10 @@
 
-from cmath import rect
 import math
 from multiprocessing import context
+from typing import Callable
 from cv2 import Mat
 import cv2
-from aoi import Rect
+from utils import Rect
 from context import FrameContext
 from utils import calculate_angle, find_central_box_index, midpoint
 
@@ -39,8 +39,15 @@ def _debug_projection(ctx: FrameContext, rects: list[Rect]):
 
     ctx._write_step("projection", img)
 
+def _write_box(img: cv2.Mat, rect: Rect, name:str, color: cv2.typing.Scalar): 
+    cv2.rectangle(img, rect.to_list(), color, 1)
+
+    if name != '':
+        text = f'{name}, A:{rect.area()}, P:[{rect.x}, {rect.y}], D:[{rect.w}x{rect.h}]'
+        cv2.putText(img, text, [rect.x, rect.y - 20], cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
 def _debug_displays(ctx: FrameContext, rects: dict[str, Rect]):
+    img = ctx.image.copy()
     color: cv2.typing.Scalar = (255, 255, 188)
 
     rect = rects["POWER"]
@@ -48,7 +55,7 @@ def _debug_displays(ctx: FrameContext, rects: dict[str, Rect]):
     center1 = rect.projected().center()
 
     for name, rect2 in rects.items():
-        _write_box(ctx, rect2, name, color)
+        _write_box(img, rect2, name, color)
 
         if name == "POWER":
             continue
@@ -62,12 +69,11 @@ def _debug_displays(ctx: FrameContext, rects: dict[str, Rect]):
 
         mid_pt = midpoint(center1, center2)
 
-        cv2.line(ctx._get_debug_image(), center1, center2, color, 2)
-        cv2.putText(ctx._get_debug_image(), text, mid_pt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        cv2.line(img, center1, center2, color, 2)
+        cv2.putText(img, text, mid_pt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-def _write_box(ctx: FrameContext, rect: Rect, name:str, color: cv2.typing.Scalar): 
-    cv2.rectangle(ctx._get_debug_image(), rect.to_list(), color, 1)
+    ctx._write_step('displays', img)
 
-    if name != '':
-        text = f'{name}, A:{rect.area()}, P:[{rect.x}, {rect.y}], D:[{rect.w}x{rect.h}]'
-        cv2.putText(ctx._get_debug_image(), text, [rect.x, rect.y - 20], cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+def _debug(ctx: FrameContext, fn: Callable):
+    if ctx.options.debug:
+        fn()

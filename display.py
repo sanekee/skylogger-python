@@ -2,10 +2,10 @@
 from typing import Tuple
 
 import cv2
-from aoi import Rect
 from context import FrameContext
+from debug import _debug
 from ssd import SSD
-from utils import area
+from utils import Rect
 
 class Digit:
     def __init__(self, ctx: FrameContext, name: str, index: int, rect: Rect):
@@ -158,10 +158,12 @@ class Display:
         for digit in self.digits:
             digit.fix_size(width, height)
 
-        if self.ctx.options.debug:
+        def __debug_fix():
             img = self.__image.copy()
             [cv2.rectangle(img, d.rect.offset(self.rect).to_list(), (255,255,0), 1) for d in self.digits]
             self.ctx._write_step(f'{self.name}-fix', img)
+
+        _debug(self.ctx, lambda: __debug_fix())
     
     def detect(self) -> str:
         res_str = ''

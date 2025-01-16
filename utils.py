@@ -1,9 +1,83 @@
 
 import math
 from typing import Optional, Tuple
+import cv2
 import numpy as np
 
-from aoi import Rect
+class Rect:
+    def __init__(self, rect:list):
+        self.x = rect[0]
+        self.y = rect[1]
+        self.w = rect[2]
+        self.h = rect[3]
+
+    def x2(self) -> int:
+        return self.x + self.w
+
+    def y2(self) -> int:
+        return self.y + self.h
+
+    def area(self) -> int:
+        return self.w * self.h
+
+    def center(self) -> Tuple[int, int]:
+        return (self.x + self.w // 2, self.y + self.h // 2)
+    
+    def offset(self, rect):
+        return Rect([self.x - rect.x, self.y - rect.y, self.w, self.h])
+
+    def contains(self, rect):
+        return self.x <= rect.x and rect.x2() <= self.x2() and \
+                self.y <= rect.y and rect.y2() <= self.y2()
+    
+    def overlapped(self, rect) -> float:
+        x1, y1, w1, h1 = self.to_list()
+        x2, y2, w2, h2 = rect.to_list()
+
+        max_x = max(x1, x2)
+        min_x2 = min(self.x2(), rect.x2())
+        max_y = max(y1, y2)
+        min_y2 = min(self.y2(), rect.y2())
+
+        if min_x2 <= max_x or min_y2 <= max_y:
+            return 0.0 
+
+        inter_area = (min_x2 - max_x) * (min_y2 - max_y)
+
+        area1 = w1 * h1
+        area2 = w2 * h2
+
+        overlap_percentage = inter_area / min(area1, area2)
+
+        return overlap_percentage
+
+    def to_list(self) -> list:
+        return [self.x, self.y, self.w, self.h]
+
+    def __eq__(self, other) -> bool:
+        return self.x == other.x and \
+                self.y == other.y and \
+                self.w == other.w and \
+                self.h == other.h
+    
+    def projected(self):
+        wmax = max(self.w, self.h * 2)
+        xmin = self.x + self.w - wmax
+        xmin = min(xmin, self.x)
+        return Rect([xmin ,self.y, wmax, self.h])
+    
+    def extract_image(self, image: cv2.Mat) -> Optional[cv2.Mat]:
+        image_height, image_width, _ = image.shape
+
+        if self.x >= image_width or \
+            self.y >= image_height:
+            return None
+        
+        w = min(self.w, image_width)
+        h = min(self.h, image_height)
+
+        return image[self.y:self.y+h, self.x:self.x+w].copy()
+            
 
 
 def find_central_box_index(rects: list[Rect]):
