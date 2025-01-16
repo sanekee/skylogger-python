@@ -32,6 +32,11 @@ class Digit:
         if orig_rect.h <= 0.5 * height:
             newx = int(orig_rect.x - (width - orig_rect.w) / 2)
             newy = int(orig_rect.y - (height - orig_rect.h) / 2)
+        
+        elif orig_rect.h >= height * 0.8 and \
+            orig_rect.w <= width * 0.6:
+            # case '1'
+            newy = int(orig_rect.y - (height - orig_rect.h) / 2)
 
         new_rect = Rect([newx, newy, width, height])
         # self.__image = self.ctx.image.copy()[new_rect.y:new_rect.y+new_rect.h, new_rect.x:new_rect.x+new_rect.w]
@@ -138,6 +143,10 @@ class Display:
                 x = self.digits[0].rect.x2() + int(self.gap_ratio * width)
                 y = digit.rect.y
 
+                if digit.rect.h >= height * 0.8 and \
+                    digit.rect.w <= width * 0.5:
+                    # case '1'
+                    y = int(digit.rect.y - (height - digit.rect.h) / 2)
                 
                 newDigit = Digit(self.ctx, self.name, 1, Rect([x, y, w, h]))
                 newDigit.sliding = True
@@ -157,6 +166,20 @@ class Display:
 
         for digit in self.digits:
             digit.fix_size(width, height)
+
+        # fix self
+        new_x, new_y, new_w, new_h = self.rect.to_list()
+        new_x2 = new_x + new_w
+        new_y2 = new_y + new_h
+        for digit in self.digits:
+            dx, dy, dw, dh = digit.rect.to_list()
+            new_x = min(new_x, dx)
+            new_y = min(new_y, dy)
+            new_x2 = max(new_x2, dx + dw) 
+            new_y2 = max(new_y2, dy + dh) 
+
+        self.rect = Rect([new_x, new_y, new_x2 - new_x, new_y2 - new_y])
+        self.__extract_image()
 
         def __debug_fix():
             img = self.__image.copy()

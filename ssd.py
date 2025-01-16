@@ -1,6 +1,8 @@
 
-from typing import Callable
+import math
+from typing import Callable, Tuple
 import cv2
+import numpy as np
 from context import FrameContext
 from debug import _debug
 from utils import area
@@ -8,12 +10,12 @@ from utils import area
 
 class Segment:
     def __init__(self, 
-                 name: str, 
-                 extract: Callable[[cv2.Mat], cv2.Mat], 
-                 filter: Callable[[cv2.Mat, list[list]], list[list]]):
+                name: str, 
+                filter: Callable[[cv2.Mat, list[list]], list[list]],
+                mask: Callable[[FrameContext, cv2.Mat], Tuple[cv2.Mat, list[list]]] = None):
         self.name = name
-        self.extract = extract
         self.filter = filter
+        self.mask = mask
 
 class SSD:
     __instance = None 
@@ -49,11 +51,6 @@ class SSD:
             "0000001": '-',
         }
 
-    @classmethod 
-    def __image_extractor(cls, left: float, right: float, top: float, bottom: float) -> Callable[[cv2.Mat], cv2.Mat]:
-        return lambda image: image[int(top * image.shape[0]):int(bottom * image.shape[0]), 
-                                   int(left * image.shape[1]):int(right * image.shape[1])]
-    
     @classmethod
     def __horizontal_filter(cls, image: cv2.Mat, boxes: list[list]) -> cv2.Mat:
         return [box for box in boxes if box[2] >= 0.5 * image.shape[1] or \
@@ -61,33 +58,76 @@ class SSD:
 
     @classmethod
     def __vertical_filter(cls, image: cv2.Mat, boxes: list[list]) -> cv2.Mat:
-        return [box for box in boxes if box[3] >= 0.5 * image.shape[0] or \
+        return [box for box in boxes if box[3] >= 0.4 * image.shape[0] or \
                                          area(box[2], box[3]) >= 0.5 * area(image.shape[1], image.shape[0])]
+    
+    @classmethod
+    def _segment_mask(cls, points: list[list[int]]) -> Callable[[cv2.Mat], cv2.Mat]:
+        def __apply_mask(ctx: FrameContext, name: str, zone_name: str, image: cv2.Mat) -> cv2.Mat:
+            h, w = image.shape
+
+            w -= 1 
+            h -= 1
+            
+            min_x = w 
+            min_y = h
+            max_x = 0
+            max_y = 0
+            coords : list[list[int]] = []
+            for p0, p1 in points:
+                x = int(p0 * w)
+                y = int(p1 * h)
+
+                min_x = min(x, min_x)
+                min_y = min(y, min_y)
+                max_x = max(x, max_x)
+                max_y = max(y, max_y)
+
+                coords.append([x, y])
+                
+            mask = np.zeros_like(image, dtype=np.uint8)
+            arr = np.array(coords, dtype=np.int32)
+            cv2.fillPoly(mask, [arr], 255)
+
+            masked = cv2.bitwise_and(image, image, mask=mask)
+            zoned = masked[min_y:max_y, min_x:max_x]
+            
+            def __debug_mask():
+                img = image.copy()
+                cv2.polylines(img, [arr], True, (255, 255, 255), 1)
+                ctx._write_step(f'{name}-{zone_name}-lines', img)
+            
+            _debug(ctx, lambda: __debug_mask())
+
+            return zoned, [min_x, min_y, max_x - min_x, max_y - min_y]
+
+        return __apply_mask
+
 
     @classmethod
     def __init_zones(cls):
         cls.__zones = {
             "top": Segment("top", 
-                        cls.__image_extractor(0.1, 0.9, 0, 0.25),
-                        cls.__horizontal_filter),
+                        cls.__horizontal_filter,
+                        cls._segment_mask([[0,0], [1,0], [0.5, 0.25]])),
             "top-right": Segment("top-right", 
-                        cls.__image_extractor(0.75, 1, 0.1, 0.45),
-                        cls.__vertical_filter),
+                        cls.__vertical_filter,
+                        cls._segment_mask([[1,0], [1,0.5], [0.5, 0.25]])),
             "bottom-right": Segment("bottom-right",
-                        cls.__image_extractor(0.65, 0.95, 0.5, 0.85),
-                        cls.__vertical_filter),
+                        cls.__vertical_filter,
+                        cls._segment_mask([[1,0.5], [1,1], [0.5, 0.75]])),
             "bottom": Segment("bottom", 
-                        cls.__image_extractor(0.1, 0.9, 0.75, 1),
-                        cls.__horizontal_filter),
+                        cls.__horizontal_filter,
+                        cls._segment_mask([[0,1], [1,1], [0.5, 0.75]])),
             "bottom-left": Segment("bottom-left",
-                        cls.__image_extractor(0.0, 0.25, 0.5, 0.85),
-                        cls.__vertical_filter),
+                        cls.__vertical_filter,
+                        cls._segment_mask([[0,1], [0,0.5], [0.5, 0.75]])),
             "top-left": Segment("top-left", 
-                        cls.__image_extractor(0.0, 0.25, 0.1, 0.45),
-                        cls.__vertical_filter),
+                        cls.__vertical_filter,
+                        cls._segment_mask([[0,0], [0,0.5], [0.5, 0.25]])),
             "middle": Segment("middle", 
-                        cls.__image_extractor(0.1, 0.9, 0.4, 0.6),
-                        cls.__horizontal_filter),
+                        cls.__horizontal_filter,
+                        cls._segment_mask([[0,0.5], [0.5,0.25], [1, 0.5], [0.5, 0.75]])),
         }
 
     @staticmethod
@@ -111,17 +151,19 @@ class SSD:
         segments = ''
         i = 0
         for zone in cls.__zones.values():
-            zone_image = zone.extract(processed_image)
+            zone_image, zone_box = zone.mask(ctx, name, f'{idx}-{zone.name}', processed_image)
 
             contours, _ = cv2.findContours(zone_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             boxes = [cv2.boundingRect(c) for c in contours]
 
             orig_boxes = boxes
             boxes = zone.filter(zone_image, boxes)
-            segments += '1' if len(boxes) > 0 else '0'
+
+            segments += '1' if  len(boxes) > 0 else '0'
 
             def __debug_zone():
-                box_image = zone.extract(image.copy())
+                x, y, w, h = zone_box
+                box_image = image[y:y+h, x:x+w].copy()
                 [cv2.rectangle(box_image, box, (0, 255, 0), 1) for box in boxes]
                 if len(boxes) == 0:
                     [cv2.rectangle(box_image, box, (0, 0, 255), 2) for box in orig_boxes]
