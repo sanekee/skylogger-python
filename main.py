@@ -6,10 +6,23 @@ import argparse
 import re
 import csv
 
-from context import Context, FrameContext, Result, Settings, Options
-from skywalker import SkyWalker, Result as SkywalkerResult
+from context import Context, FrameContext, Settings, Options
+from skywalker import SkyWalker, Result
 
-def process_image(ctx: FrameContext) -> Optional[SkywalkerResult]:
+def write_result(ctx: Context, results: list[Result]):
+    if len(results) == 0:
+        return
+
+    outFile = os.path.join(ctx.settings.output_path, 'results.csv')
+    with open(outFile, 'w') as f:
+        wrt = csv.writer(f, delimiter=',')
+        wrt.writerow(['name', 'time', 'temperature','profile','power','fan','mode'])
+
+        for res in results:
+            wrt.writerow([res.name, res.time, res.temperature, res.profile, res.power, res.fan, res.mode])
+
+
+def process_image(ctx: FrameContext) -> Optional[Result]:
     degrees: List[int] = [0]
     options: Options = ctx.options
 
@@ -36,9 +49,6 @@ def process_image(ctx: FrameContext) -> Optional[SkywalkerResult]:
             
     return None
 
-def convert_result(name: str, res: any) -> Result:
-    return Result(name, res.temperature, res.profile, res.power, res.fan, res.time, res.mode)
-
 def process_video(ctx: Context):
     settings: Settings = ctx.settings
     options: Options = ctx.options
@@ -62,7 +72,7 @@ def process_video(ctx: Context):
         line = process_image(ctx.new_frame_context(f"frame_{cur_sec}", frame))
 
         if line is not None:
-            results.append(convert_result(f'frame_{cur_sec}', line))
+            results.append(line)
 
         if options.count > 0:
             num_frames = num_frames - 1
@@ -73,7 +83,7 @@ def process_video(ctx: Context):
 
     video.release()
 
-    ctx.write_result(results)
+    write_result(ctx, results)
 
 def main(args):
     input_path = args.input_path

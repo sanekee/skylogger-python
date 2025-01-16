@@ -63,19 +63,6 @@ class FrameContext:
         cv2.imwrite(output_path, image)
         self.__step_counter += 1
 
-
-
-class Result:
-    def __init__(self, name: str, temperature: int, profile: str, power: int, fan: int, time: int, mode: str):
-        self.name = name
-        self.temperature = temperature
-        self.profile = profile
-        self.power = power
-        self.fan = fan
-        self.time = time
-        self.mode = mode
-        
-
 class Context:
     def __init__(self, args: argparse.Namespace):
         self.settings = Settings(args.input_path, args.output_path)
@@ -91,18 +78,3 @@ class Context:
 
     def new_frame_context(self, name: str, image: cv2.Mat):
         return FrameContext(name, image, self.options, self._debug_path)
-
-    def write_result(self, results: list[Result]):
-        if len(results) == 0:
-            return
-
-        outFile = os.path.join(self.settings.output_path, 'results.csv')
-        with open(outFile, 'w') as f:
-            wrt = csv.writer(f, delimiter=',')
-            wrt.writerow(['name', 'time', 'temperature','profile','power','fan','mode'])
-
-            for res in results:
-                wrt.writerow([res.name, res.time, res.temperature, res.profile, res.power, res.fan, res.mode])
-
-
-

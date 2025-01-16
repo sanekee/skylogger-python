@@ -1,11 +1,9 @@
 
-import math
 from typing import Tuple
 
 import cv2
 from aoi import Rect
 from context import FrameContext
-from debug import _debug_boxes
 from ssd import SSD
 from utils import area
 
@@ -22,17 +20,11 @@ class Digit:
         
 
     def __extract_image(self):
-        # x, y, w, h = self.rect.to_list()
-        # self.__image = self.ctx.image.copy()[y:y+h, x:x+w]
         self.__image = self.rect.extract_image(self.ctx.image)
 
     def fix_size(self, width: int, height: int):
         orig_rect = self.rect
         
-        # issue with TIME display colon got merged into other digit
-        if width < orig_rect.w:
-            return
-
         # for x, just expand left
         newx = orig_rect.x - (width - orig_rect.w)
         newy = orig_rect.y
@@ -156,14 +148,9 @@ class Display:
                 new_digits.append(self.digits[3])
                 
                 self.digits = new_digits
-            
-        # if self.ctx.options.debug:
-        #     img = self.__image.copy()
-        #     [cv2.rectangle(img, d.rect.offset(self.rect).to_list(), (255,255,0), 1) for d in self.digits]
-        #     self.ctx._write_step(f'{self.name}-fix', img)
 
     def fix_digits_size(self, width: int, height: int):
-        if self.name.startswith("MODE_"):
+        if self.skip_detect:
             return
         elif self.fix_colon:
             self.__fix_colon_issue(width, height)
@@ -176,89 +163,6 @@ class Display:
             [cv2.rectangle(img, d.rect.offset(self.rect).to_list(), (255,255,0), 1) for d in self.digits]
             self.ctx._write_step(f'{self.name}-fix', img)
     
-    def __fix_time_digit(self, digit: Digit) -> str:
-        if digit.index != 1:
-            return ' '
-        
-        new_digits: list[Rect] = []
-
-        res_str = ''
-        if len(self.digits) == 3: # case where 01:23 1:2 merged in a digit zone
-            print(f'{self.ctx.name}-{self.name}-{digit.index}: splitting digit')
-            # digit 1
-            w = self.__digit_size[0]
-            h = self.__digit_size[1]
-            x = self.digits[0].rect.x2() + int(self.gap_ratio * self.__digit_size[0])
-            y = self.digits[0].rect.y
-
-            idx = 1
-            while x + w < digit.rect.x2():
-                newDigit = Digit(self.ctx, self.name, idx, Rect([x, y, w, h]))
-                res = newDigit.detect()
-                if res is None:
-                    x += 5
-                    continue
-
-                break
-
-            new_digits.append(newDigit)
-            res_str += res if res is not None else ' '
-            
-            # digit 2
-            idx = 2
-            w = self.__digit_size[0]
-            h = self.__digit_size[1]
-            x = digit.rect.x2() - w
-            y = self.digits[0].rect.y
-
-            newDigit = Digit(self.ctx, self.name, idx, Rect([x, y, w, h]))
-            res = newDigit.detect()
-            
-            new_digits.append(newDigit)
-           
-            res_str += res if res is not None else ' '
-            
-            print(f'{self.ctx.name}-{self.name}-{digit.index}: fix result {res_str}')
-        
-        if len(self.digits) == 4: # case where colon 01:23 1: merged in a digit zone
-            print(f'{self.ctx.name}-{self.name}-{digit.index}: fixing digit')
-            # digit 1
-            w = self.__digit_size[0]
-            h = self.__digit_size[1]
-            x = self.digits[0].rect.x2() + int(self.gap_ratio * self.__digit_size[0])
-            y = self.digits[0].rect.y
-
-            res_str = ''
-            idx = 1
-            while x + w < digit.rect.x2():
-                newDigit = Digit(self.ctx, self.name, idx, Rect([x, y, w, h]))
-                res = newDigit.detect()
-                if res is None:
-                    x += 5
-                    continue
-                break
-
-            new_digits.append(newDigit)
-            res_str += res if res is not None else ' '
-            print(f'{self.ctx.name}-{self.name}-{digit.index}: fix result {res_str}')
-
-        if len(new_digits) > 0 and len(self.digits) > 2:
-            new_digits.insert(0, self.digits[0])
-            
-            for i in range(len(self.digits) - 1, len(self.digits), 1):
-                new_digits.append(Digit(self.ctx, self.name, i, Rect(self.digits[i].rect.to_list())))
-            
-
-            if self.ctx.options.debug:
-                img = self.__image.copy()
-
-                for d in new_digits:
-                    cv2.rectangle(img, d.rect.offset(self.rect).to_list(), (0, 255, 255), 1)
-
-                self.ctx._write_step(f'{self.name}-fixdigit', img)
-
-        return res_str
-
     def detect(self) -> str:
         res_str = ''
 

@@ -4,7 +4,6 @@ import cv2
 
 from context import FrameContext
 
-
 class Rect:
     def __init__(self, rect:list):
         self.x = rect[0]
@@ -80,14 +79,12 @@ class Rect:
         return image[self.y:self.y+h, self.x:self.x+w].copy()
             
 
-
-    
 class AOI:
     def __init__(self, rect: Rect):
         self.rect = rect
         self.items : list[AOI] = [rect]
 
-    def merge(self, rect: Rect):
+    def group(self, rect: Rect):
         newX = min(self.rect.x, rect.x)
         newY = min(self.rect.y, rect.y)
         newX2 = max(self.rect.x2(), rect.x2())
@@ -99,7 +96,7 @@ class AOI:
         self.items = sorted(self.items, key=lambda item: item.x)
 
 
-def find_aoi(ctx: FrameContext, image: cv2.Mat, minArea: int = 50, xThreshold: int = 100, yThreshold: int = 100) -> list:
+def find_aoi(ctx: FrameContext, image: cv2.Mat, minArea: int = 50, xThreshold: int = 100) -> list:
     def filter_area(contours):
         for c in contours:
             if cv2.contourArea(c) > minArea:
@@ -137,7 +134,7 @@ def find_aoi(ctx: FrameContext, image: cv2.Mat, minArea: int = 50, xThreshold: i
             cur_row = AOI(rect)
         else:
             if is_same_row(cur_row.rect, rect):
-                cur_row.merge(rect)
+                cur_row.group(rect)
             else:
                 aoiRows.append(cur_row)
                 cur_row = AOI(rect)
@@ -157,7 +154,7 @@ def find_aoi(ctx: FrameContext, image: cv2.Mat, minArea: int = 50, xThreshold: i
 
         ctx._write_step("aoi-row", img)
 
-    # merge nearby boxes horizontally
+    # group nearby boxes horizontally
     aois : list[AOI] = []
     for row in aoiRows:
         rects = sorted(row.items, key=lambda b: b.x)
@@ -171,7 +168,7 @@ def find_aoi(ctx: FrameContext, image: cv2.Mat, minArea: int = 50, xThreshold: i
                     if cur_aoi.rect.overlapped(rect) > 0.8:
                         print('skip overlapped rect')
                     else:
-                        cur_aoi.merge(rect)
+                        cur_aoi.group(rect)
                 else:
                     aois.append(cur_aoi)
                     cur_aoi = AOI(rect)

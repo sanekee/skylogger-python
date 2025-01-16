@@ -65,12 +65,6 @@ def _debug_displays(ctx: FrameContext, rects: dict[str, Rect]):
         cv2.line(ctx._get_debug_image(), center1, center2, color, 2)
         cv2.putText(ctx._get_debug_image(), text, mid_pt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-def _debug_boxes(ctx: FrameContext, boxes: list[list]):
-    color: cv2.typing.Scalar = (0, 255, 255)
-
-    for i, box2 in enumerate(boxes):
-        _write_box(ctx, box2, '', color)
-
 def _write_box(ctx: FrameContext, rect: Rect, name:str, color: cv2.typing.Scalar): 
     cv2.rectangle(ctx._get_debug_image(), rect.to_list(), color, 1)
 

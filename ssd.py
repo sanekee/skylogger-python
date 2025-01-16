@@ -5,10 +5,6 @@ from context import FrameContext
 from utils import area
 
 
-class SSDResults:
-    def __init__(self, name: str):
-        self.name = name
-
 class Segment:
     def __init__(self, 
                  name: str, 
@@ -17,6 +13,7 @@ class Segment:
         self.name = name
         self.extract = extract
         self.filter = filter
+
 class SSD:
     __instance = None 
     __patterns : dict[str, str] = {}
@@ -60,8 +57,6 @@ class SSD:
     def __horizontal_filter(cls, image: cv2.Mat, boxes: list[list]) -> cv2.Mat:
         return [box for box in boxes if box[2] >= 0.5 * image.shape[1] or \
                 area(box[2], box[3]) >= 0.7 * area(image.shape[1], image.shape[0])]
-                
-                                         
 
     @classmethod
     def __vertical_filter(cls, image: cv2.Mat, boxes: list[list]) -> cv2.Mat:
@@ -100,7 +95,7 @@ class SSD:
 
         _, threshold_image = cv2.threshold(gray_image, 200, 255, cv2.THRESH_BINARY) 
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))  # You can adjust the size (5, 5)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5)) 
         dilated = cv2.dilate(threshold_image , kernel, iterations=1)
         closed = cv2.morphologyEx(dilated, cv2.MORPH_CLOSE, kernel)
 

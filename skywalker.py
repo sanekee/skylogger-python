@@ -5,20 +5,20 @@ from cv2 import Mat
 import cv2
 from aoi import find_aoi
 from context import FrameContext
-from debug import _debug_boxes, _debug_displays, _debug_projection
+from debug import _debug_displays, _debug_projection
 from display import Digit, Display
 from utils import calculate_projection, find_central_box_index, find_projection_rect_index
 
-
 class Section:
-    def __init__(self, name: str, angle: float, length: float):
+    def __init__(self, name: str, angle: float, length: float, skip_detect: bool = False):
         self.name = name
         self.angle = angle
         self.length = length
+        self.skip_detect = skip_detect
 
 class Result:
-    def __init__(self):
-        self.name = ""
+    def __init__(self, name: str):
+        self.name = name
         self.temperature = 0
         self.profile = ""
         self.power = 0
@@ -40,9 +40,9 @@ class SkyWalker():
             "POWER": Section("POWER", 0, 0),
             "FAN": Section("FAN", 0.0, 4.67),
             "TIME": Section("TIME", 165.21, 4.48),
-            "MODE_PREHEAT": Section("MODE_PREHEAT", 113.12, 4.24),
-            "MODE_ROAST": Section("MODE_ROAST", 84.61, 4.08),
-            "MODE_COOL": Section("MODE_COOL", 54.85, 4.77),
+            "MODE_PREHEAT": Section("MODE_PREHEAT", 113.12, 4.24, True),
+            "MODE_ROAST": Section("MODE_ROAST", 84.61, 4.08, True),
+            "MODE_COOL": Section("MODE_COOL", 54.85, 4.77, True),
         }
 
     def __preprocess_image(self) -> Mat:
@@ -70,7 +70,6 @@ class SkyWalker():
         displays['POWER'] = Display(self.ctx, 'POWER', aoi.rect, [Digit(self.ctx, 'POWER', i, rect) for i, rect in enumerate(aoi.items)])
         
         rects = [aoi.rect for aoi in aois]
-
         if self.ctx.options.debug:
             _debug_projection(self.ctx, rects)
 
@@ -85,15 +84,17 @@ class SkyWalker():
                 continue
 
             aoi2 = aois[idx2]
-            display = Display(self.ctx, section.name, aoi2.rect, [Digit(self.ctx, section.name, i, rect) for i, rect in enumerate(aoi2.items)])
+
+            display = Display(self.ctx, section.name, aoi2.rect, [Digit(self.ctx, section.name, i, rect) 
+                                                                  for i, rect in enumerate(aoi2.items)])
             if section.name == "TIME":
                 display.fix_colon = True
 
-            if section.name.startswith("MODE_"):
-                display.skip_detect = True
+            display.skip_detect = section.skip_detect
 
             displays[section.name] =  display
 
+        # fix digit size using maximum values from the more reliable displays (TEMPERATURE ,POWER and FAN)
         digit_width, digit_height = 0, 0
         for name in ["TEMPERATURE", 'POWER', 'FAN']:
             if not name in displays:
@@ -115,13 +116,16 @@ class SkyWalker():
             return 0
 
         if len(time_str) != 4 or not time_str.isdigit():
-            raise ValueError("invalid time")
+            raise ValueError(f'invalid time {time_str}')
         
         minutes = int(time_str[:2])
         seconds = int(time_str[2:])
+
+        if minutes >= 60:
+            raise ValueError(f'invalid minutes {minutes}')
         
         if seconds >= 60:
-            raise ValueError("invalid seconds")
+            raise ValueError(f'invalid seconds {seconds}')
         
         total_seconds = minutes * 60 + seconds
         return total_seconds
@@ -132,9 +136,11 @@ class SkyWalker():
         displays = self.__detect_displays(processed_image)
 
         if not displays:
+            print('skywalker display not found')
             return None
 
         if not 'POWER' in displays:
+            print('skywalker power display not found')
             return None
 
         ctx = self.ctx
@@ -142,7 +148,7 @@ class SkyWalker():
             _debug_displays(ctx, {key: disp.rect for key, disp in displays.items()})
             ctx._new_debug()
                 
-        res:Result = Result()
+        res:Result = Result(self.ctx.name)
         for display in displays.values():
             if not display.skip_detect:
                 value = display.detect()
