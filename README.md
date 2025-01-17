@@ -14,8 +14,9 @@ flowchart LR
     C --> |Yes| F[Extract Image]
     F --> G[Detect Area of Interest #40;AOI#41;]
     G --> I[Grouping Displays]
-    I --> J[Detect SSD] --> C
-    
+    I --> J[Detect SSD]
+    J --> K[Return Result] --> C
+
 ```
 
 ## Sample
