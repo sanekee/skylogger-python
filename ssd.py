@@ -7,12 +7,16 @@ from context import FrameContext
 from debug import _debug
 from utils import area
 
+class Mask:
+    def __init__(self, box: list[list], arr: np.array):
+        self.box = box
+        self.array = arr
 
 class Segment:
     def __init__(self, 
                 name: str, 
                 filter: Callable[[cv2.Mat, list[list]], list[list]],
-                mask: Callable[[FrameContext, cv2.Mat], Tuple[cv2.Mat, list[list]]] = None):
+                mask: Callable[[FrameContext, cv2.Mat], Tuple[cv2.Mat, Mask]] = None):
         self.name = name
         self.filter = filter
         self.mask = mask
@@ -63,7 +67,7 @@ class SSD:
     
     @classmethod
     def _segment_mask(cls, points: list[list[int]]) -> Callable[[cv2.Mat], cv2.Mat]:
-        def __apply_mask(ctx: FrameContext, name: str, zone_name: str, image: cv2.Mat) -> cv2.Mat:
+        def __apply_mask(ctx: FrameContext, name: str, zone_name: str, image: cv2.Mat) -> Tuple[cv2.Mat, Mask]:
             h, w = image.shape
 
             w -= 1 
@@ -92,14 +96,8 @@ class SSD:
             masked = cv2.bitwise_and(image, image, mask=mask)
             zoned = masked[min_y:max_y, min_x:max_x]
             
-            def __debug_mask():
-                img = image.copy()
-                cv2.polylines(img, [arr], True, (255, 255, 255), 1)
-                ctx._write_step(f'{name}-{zone_name}-lines', img)
-            
-            _debug(ctx, lambda: __debug_mask())
 
-            return zoned, [min_x, min_y, max_x - min_x, max_y - min_y]
+            return zoned, Mask([min_x, min_y, max_x - min_x, max_y - min_y], arr) 
 
         return __apply_mask
 
@@ -150,8 +148,12 @@ class SSD:
            
         segments = ''
         i = 0
+        
+        if ctx.options.debug:
+            debug_image = image.copy()
+
         for zone in cls.__zones.values():
-            zone_image, zone_box = zone.mask(ctx, name, f'{idx}-{zone.name}', processed_image)
+            zone_image, zone_mask = zone.mask(ctx, name, f'{idx}-{zone.name}', processed_image)
 
             contours, _ = cv2.findContours(zone_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             boxes = [cv2.boundingRect(c) for c in contours]
@@ -162,17 +164,34 @@ class SSD:
             segments += '1' if  len(boxes) > 0 else '0'
 
             def __debug_zone():
-                x, y, w, h = zone_box
-                box_image = image[y:y+h, x:x+w].copy()
-                [cv2.rectangle(box_image, box, (0, 255, 0), 1) for box in boxes]
-                if len(boxes) == 0:
-                    [cv2.rectangle(box_image, box, (0, 0, 255), 2) for box in orig_boxes]
-                ctx._write_step(f'{name}-{idx}-{zone.name}', box_image)
+                x, y, w, h = zone_mask.box
+                def __zone_box(box: list) -> list:
+                    return [box[0] + x, box[1] + y, box[2], box[3]]
+                
+                def __masked_box(box: list, color: cv2.typing.Scalar):
+                    nonlocal debug_image
+
+                    mask_img = np.zeros_like(image)
+                    box_img = np.zeros_like(image)
+
+                    cv2.fillPoly(mask_img, [zone_mask.array], 255)
+                    cv2.rectangle(box_img, __zone_box(box), color, -1)
+
+                    intersected = cv2.bitwise_and(box_img, box_img, mask_img)
+
+                    debug_image = cv2.addWeighted(debug_image, 1, intersected, 1, 0)
+                
+                [__masked_box(box, (0, 255, 0)) for box in boxes]
+                # if len(boxes) == 0:
+                #     [__masked_box(box, (0, 0, 255)) for box in orig_boxes]
+                
+                cv2.polylines(debug_image, [zone_mask.array], True, (0, 255, 255), 1)
 
             _debug(ctx, lambda: __debug_zone())
 
             i+=1
         
+        _debug(ctx, lambda: ctx._write_step(f'{name}-{idx}-diag', debug_image))
         _debug(ctx, lambda: print(f'{ctx.name}-{name}-{idx} pattern {segments}'))
 
         if segments in cls.__patterns:

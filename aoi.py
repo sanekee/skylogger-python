@@ -109,7 +109,7 @@ def find_aoi(ctx: FrameContext, image: cv2.Mat, minArea: int = 50, xThreshold: i
         for i, aoi in enumerate(aois):
             cv2.rectangle(img, aoi.rect.to_list(), (255,255,255), 2)
             [cv2.rectangle(img, rect.to_list(), (0,255,255), 1) for rect in aoi.items]
-            cv2.putText(img, f'row-{i}', [row.rect.x, row.rect.y - 20], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
+            cv2.putText(img, f'aoi-{i}', [aoi.rect.x, aoi.rect.y - 20], cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
         
         ctx._write_step("aois", img)
 
