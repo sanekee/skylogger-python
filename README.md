@@ -1,7 +1,25 @@
 # Skylogger - Python, OpenCV2
+
+## Overview
+
 An Itop Skywalker coffee roaster logger. 
 
-Automatic extract roating profile using opencv2 and image masking to detect seven segment display digits from the coffee roaster control panel.
+Extract roating profile using opencv2 to detect seven segment display digits from the coffee roaster control panel.
+
+```mermaid
+flowchart LR
+    A[Start] --> B[Load Video]
+    B --> C{Get Each Interval}
+    C -->|No| D['Write Results] --> E[END]
+    C --> |Yes| F[Extract Image]
+    F --> G[Detect Area of Interest #40;AOI#41;]
+    G --> I[Grouping Displays]
+    I --> J[Detect SSD]
+    J --> K[Return Result] --> C
+
+```
+
+## Sample
 
 ![Sample](./assets/sample.png)
 
@@ -10,57 +28,44 @@ Automatic extract roating profile using opencv2 and image masking to detect seve
 1. Using Dev Container
 2. runs with python3 main.py &lt;input video&gt; &lt;output path&gt;<br/>
    **Args**:
-   | Arg | Description |
-   | --- | ------------------------ |
-   | --masks | Directory with masks images. |
-   | --rotate | Rotate image [auto|degree] |
-   | --interval | Extract frame every second |
-   | --skip | Skip seconds from beginning of video |
-   | --count | Number of frame to extract |
-   | --debug | Output debugging images [true|false] |
+   | Arg        | Description                           |
+   |------------|---------------------------------------|
+   | --rotate   | Rotate image [auto,<number of degree] |
+   | --interval | Extract frame every second            |
+   | --skip     | Skip seconds from beginning of video  |
+   | --count    | Number of frame to extract            |
+   | --debug    | Output debugging images               |
 
    Example:
     ```shell
-    python3 main.py video.mp4 output --debug=true --masks=./masks --rotate=auto --skip=5 --count=10 --interval=30
+    python3 main.py video.mp4 output --debug=true  --rotate=auto --skip=5 --count=10 --interval=30
     ```
-## Operation Steps
 
-### 1. Detect contours from the control panel
+## Implementation
 
-![Contours](./assets/step1-contours.png)
+### 1. Detect Area of Interest (AOI)
 
-### 2. Group contours by row and column
+![Area of Interest](./assets/step1-aoi.png)
 
-![Groups](./assets/step2-groups.png)
+### 2. Extract Digits
 
-### 3. Exract area of interests (monitoring area - Temperature / Power / Fan)
+| Area of Interest | Digits                                             |
+|------------------|----------------------------------------------------|
+| Temperature      | ![TEMPERATURE](./assets/step2-aoi-temperature.png) |
+| Power            | ![POWER](./assets/step2-aoi-power.png)             |
+| Fan              | ![FAN](./assets/step2-aoi-fan.png)                 |
+| Profile          | ![PROFILE](./assets/step2-aoi-profile.png)         |
+| Time             | ![TIME](./assets/step2-aoi-time.png)               |
 
+### 3. Detect Digit Segments
 
-| Area of Interest | |
-|--|--|
-| Temperature | ![TEMP](./assets/step3-temp.png) |
-| Power | ![POWER](./assets/step3-power.png) |
-| Fan | ![FAN](./assets/step3-fan.png) |
-
-### 4. Extract Digits
-
-|Digit 1|Digit 2|Digit 3|
-|--|--|--|
-|![TEMP Digit 1](./assets/step4-temp1.png)|![TEMP Digit 2](./assets/step4-temp2.png)|![TEMP Digit 3](./assets/step4-temp3.png)|
-
-### 5. Detect Digits With Masks
-
-![Masks](./assets/step5-masks.png)
+![Segments](./assets/step3-segments.png)
 
 
-### 6. Output
-
-![Output](./assets/output.png)
-
-### 7. Sample output
+### 4. Sample output
 
 [Result.csv](./assets/results.csv)
 
-
 ## What Next
-- [ ] Explore seven segment display detection with tesseract and custom training data.
+- [ ] Explore detection with tesseract
+- [ ] Explore detection with tensorflow / pytorch
