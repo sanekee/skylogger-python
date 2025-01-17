@@ -62,7 +62,7 @@ flowchart LR
 ![Segments](./assets/step3-segments.png)
 
 
-### 7. Sample output
+### 4. Sample output
 
 [Result.csv](./assets/results.csv)
 
