@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:22.04 as base
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -36,6 +36,23 @@ RUN apt update && \
 
 # use pip for intellisense
 #python3-opencv
+
+FROM base as runtime
+
+ARG USERNAME=dev
+ARG VCS_SERVER_PATH="/home/${USERNAME}/.vscode-server"
+
+RUN groupadd --gid 1000 ${USERNAME}
+RUN useradd -rm -d /home/${USERNAME} -s /bin/bash --gid 1000 -G sudo --uid 1000 ${USERNAME}
+
+VOLUME [ "${VCS_SERVER_PATH}"]
+
+RUN set -eux; \
+    mkdir -p ${VCS_SERVER_PATH} && \
+    chown ${USERNAME}:${USERNAME} ${VCS_SERVER_PATH}
+
+USER 1000:1000
+ENV HOME=
 
 WORKDIR /app
 
