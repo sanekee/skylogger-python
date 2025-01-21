@@ -6,7 +6,7 @@ An Itop Skywalker coffee roaster logger.
 
 [AI Version](https://github.com/sanekee/skylogger-paddle)
 
-Extract roating profile using OpenCV2 image processing to recognize seven segment display digits from the coffee roaster control panel.
+Extract roasting profile using OpenCV2 image processing to recognize seven segment display digits from the coffee roaster control panel.
 
 ```mermaid
 flowchart LR
