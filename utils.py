@@ -92,11 +92,8 @@ def find_central_box_index(rects: list[Rect]):
 
 def calculate_projection(rect: Rect, ratio: float, angle: float) -> Tuple[int, int]:
     x1, y1, w1, h1 = rect.to_list()
-    px, py = rect.center()
+    px, py = rect.projected().center()
 
-    wmax = max(w1, h1*2)
-    xmin = x1 + w1 - wmax
-    xmin = min(x1, xmin)
     angle_radians = math.radians(angle)
     dx = h1 * ratio * math.cos(angle_radians)
     dy = h1 * ratio * math.sin(angle_radians)
@@ -105,12 +102,9 @@ def calculate_projection(rect: Rect, ratio: float, angle: float) -> Tuple[int, i
 def find_projection_rect_index(pt2: Tuple[int, int], rects: list[Rect]) -> Optional[int]:
     px, py = pt2 
     for i, rect in enumerate(rects):
-        x, y, w, h = rect.to_list()
-        wmax = max(w, h*2)
-        xmin = x + w - wmax
-        xmin = min(x, xmin)
-        if xmin <= px <= xmin + wmax and \
-            y <= py <= y + h:
+        x, y = rect.projected().center()
+        distance = int(math.sqrt((((px - x) ** 2) + ((py - y) ** 2))))
+        if distance <= (rect.h * 2):
             return i
 
     return None
